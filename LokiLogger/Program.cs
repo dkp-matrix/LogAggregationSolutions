@@ -40,6 +40,7 @@ namespace LokiLogger
 
             Console.WriteLine("1. Grafana Loki Test Plan Execution");
             Console.WriteLine("2. Grafana Loki Only Query Execution");
+            Console.Write("Select : ");
 
             int val = Console.Read();
 
