@@ -1,0 +1,88 @@
+auth_enabled: false # No authentication required
+
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9096
+  log_level: error # Change to "info" or "debug" for troubleshooting
+  grpc_server_max_recv_msg_size: 268435456
+  grpc_server_max_send_msg_size: 268435456
+
+common:
+  path_prefix: C:\grafana-loki\data
+  storage:
+    filesystem:
+      chunks_directory: C:\grafana-loki\data\chunks
+      rules_directory: C:\grafana-loki\data\rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: memberlist # Required for single-node operation
+
+storage_config:
+  filesystem:
+    directory: C:\grafana-loki\data # Store logs locally
+
+compactor:
+  working_directory: C:\grafana-loki\data\compactor
+  retention_enabled: true # Enable retention policy
+  retention_delete_delay: 0s # No delay (since we are not deleting)
+  retention_delete_worker_count: 5 # Performance optimization
+  delete_request_store: filesystem # REQUIRED to enable retention policy!
+
+schema_config:
+  configs:
+    - from: 2024-01-01
+      store: tsdb
+      object_store: filesystem # Store logs on local disk
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h # Index every 24 hours for better performance
+
+limits_config:
+  reject_old_samples: true
+  reject_old_samples_max_age: 720h # Allow logs up to 30 days old (30 days × 24h)
+  max_global_streams_per_user: 100000 # Allow many concurrent streams
+  max_entries_limit_per_query: 50000 # Increase max logs per query (default is 5000)
+  max_query_series: 100000 # Allow searching a large number of streams
+  ingestion_rate_mb: 200 # Allow high log ingestion rate
+  ingestion_burst_size_mb: 500 # Burst limit to handle log spikes
+  metric_aggregation_enabled: false
+  max_query_parallelism: 64 # Increase parallel queries for better performance
+  query_timeout: 10m # Allow long-running queries
+
+table_manager:
+  retention_deletes_enabled: false # Do not delete old logs
+  retention_period: 720h # Retain logs for 30 days
+
+frontend:
+  max_outstanding_per_tenant: 2048 # Allow more queries to run in parallel
+
+frontend_worker:
+  frontend_address: 127.0.0.1:9096
+  grpc_client_config:
+    max_recv_msg_size: 268435456 # 256MB
+    max_send_msg_size: 268435456 # 256MB
+
+query_scheduler:
+  max_outstanding_requests_per_tenant: 20000 # Support high query load
+
+ingester:
+  wal:
+    enabled: true # Enable Write-Ahead Logging (WAL) for data durability
+    dir: C:\grafana-loki\data\wal # WAL storage directory
+  chunk_idle_period: 10m # Chunks are flushed every 10 minutes
+  chunk_retain_period: 30s # Retain chunks before deletion
+  max_chunk_age: 1h # Age limit for chunks before they are written to storage
+  chunk_target_size: 1572864 # Optimize chunk size for better performance
+  chunk_encoding: snappy # Compress logs using Snappy for storage efficiency
+
+querier:
+  query_ingesters_within: 3h # Look for recent logs from ingesters
+  max_concurrent: 64 # Allow more concurrent queries
+
+ruler:
+  storage:
+    type: local
+    local:
+      directory: C:\grafana-loki\data\rules # Store rule files locally
