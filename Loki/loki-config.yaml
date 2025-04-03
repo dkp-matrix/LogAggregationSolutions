@@ -86,3 +86,8 @@ ruler:
     type: local
     local:
       directory: C:\grafana-loki\data\rules # Store rule files locally
+
+metrics:
+  server:
+    enabled: true
+    listen_port: 3101 # Exposes Prometheus metrics

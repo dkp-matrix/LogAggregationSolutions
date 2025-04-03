@@ -27,6 +27,7 @@ namespace LokiLogger
         private static readonly Dictionary<string, List<double>> PerformanceMetrics = new();
         private static readonly PerformanceCounter CpuCounter = new("Processor", "% Processor Time", "_Total");
         private static readonly Dictionary<string, long> MemoryUsage = new();
+        private static Timer _metricsTimer;
 
         #endregion
 
@@ -39,10 +40,12 @@ namespace LokiLogger
                 AppGlobal.UserName = str;
 
             Console.WriteLine("1. Grafana Loki Test Plan Execution");
-            Console.WriteLine("2. Grafana Loki Only Query Execution");
+            Console.WriteLine("2. Grafana Loki Continue Push Log");
+            Console.WriteLine("3. Grafana Loki Only Query Execution");
             Console.Write("Select : ");
 
-            int val = Console.Read();
+            string? input = Console.ReadLine();
+            int.TryParse(input, out int val);
 
             switch (val)
             {
@@ -121,6 +124,40 @@ namespace LokiLogger
                     finally
                     {
                         Log.CloseAndFlush();
+                    }
+
+                    #endregion
+                    break;
+                case 2:
+                    #region Continue Push Log
+
+                    Console.Write("Total Logs per second : ");
+                    input = Console.ReadLine();
+                    int.TryParse(input, out int totalLogsPerSecond);
+
+                    if (totalLogsPerSecond > 0)
+                    {
+                        // ENV-001: Verify Loki is running
+                        Console.WriteLine("\n[TEST CASE ENV-001] Verifying Loki installation...");
+                        if (!await VerifyLokiIsRunning())
+                        {
+                            Console.WriteLine("[FAILED] Loki is not running or accessible. Please start Loki on port 3100.");
+                            return;
+                        }
+                        Console.WriteLine("[PASSED] Loki is running correctly.");
+
+                        // ENV-002: Configure Serilog with Loki
+                        Console.WriteLine("\n[TEST CASE ENV-002] Configuring Serilog with Loki...");
+                        ConfigureSerilog();
+                        Console.WriteLine("[PASSED] Serilog configured successfully.");
+
+                        int count = 0;
+                        while (true)
+                        {
+                            Console.WriteLine($"\n[TEST CASES ING-{count + 1:000}, RES-{count + 1:000}] " + $"Testing ingestion at {totalLogsPerSecond} logs/second...");
+                            await RunLogIngestionTest(totalLogsPerSecond);
+                            count++;
+                        }
                     }
 
                     #endregion
@@ -636,6 +673,36 @@ namespace LokiLogger
 
             return logs;
         }
+
+        private static void StartMetricsTimer()
+        {
+            _metricsTimer = new Timer(async _ =>
+            {
+                await GetLokiMetrics();
+            }, null, TimeSpan.Zero, TimeSpan.FromSeconds(10));
+        }
+
+        private static async Task GetLokiMetrics()
+        {
+            var metricsUrl = $"{AppGlobal.LokiUrl}/metrics";
+            try
+            {
+                var response = await HttpClient.GetAsync(metricsUrl);
+                if (!response.IsSuccessStatusCode)
+                {
+                    Console.WriteLine($"Failed to fetch metrics: {response.StatusCode}");
+                    return;
+                }
+
+                var metricsData = await response.Content.ReadAsStringAsync();
+                Console.WriteLine("Loki Metrics:\n" + metricsData);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error fetching Loki metrics: {ex.Message}");
+            }
+        }
+
 
         private static void PrintTestResults()
         {

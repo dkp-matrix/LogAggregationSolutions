@@ -6,9 +6,8 @@ Loki is a horizontally scalable, multi-tenant log aggregation system inspired by
 
 Before running Loki, ensure that you have the following:
 
-- Windows OS (64-bit)
-- [loki-windows-amd64.exe](https://grafana.com/docs/loki/latest/installation/local/) (Downloaded from Grafana's official website)
-- A valid `loki-config.yml` configuration file
+- [loki-windows-amd64.exe](https://grafana.com/docs/loki/latest/installation/local/) (Downloaded from Grafana's official website) for Windows OS (64-bit)
+- A valid `loki-config.yaml` configuration file
 
 ## Setup and Running Loki
 
@@ -20,48 +19,9 @@ Before running Loki, ensure that you have the following:
 
 ### 2. Create the Configuration File
 
-Create a `loki-config.yml` file in the same directory as `loki-windows-amd64.exe`. A basic configuration file may look like this:
+Create a `loki-config.yaml` file in the same directory as `loki-windows-amd64.exe`. A basic configuration file may look like this:
 
-```yaml
-auth_enabled: false
-server:
-  http_listen_port: 3100
-ingester:
-  lifecycler:
-    address: 127.0.0.1
-    ring:
-      kvstore:
-        store: inmemory
-      replication_factor: 1
-    final_sleep: 0s
-  chunk_idle_period: 5m
-  chunk_retain_period: 30s
-schema_config:
-  configs:
-    - from: 2024-01-01
-      store: boltdb-shipper
-      object_store: filesystem
-      schema: v11
-      index:
-        prefix: index_
-        period: 24h
-storage_config:
-  boltdb_shipper:
-    active_index_directory: /tmp/loki/index
-    cache_location: /tmp/loki/index_cache
-    shared_store: filesystem
-  filesystem:
-    directory: /tmp/loki/chunks
-limits_config:
-  enforce_metric_name: false
-  reject_old_samples: true
-  reject_old_samples_max_age: 168h
-chunk_store_config:
-  max_look_back_period: 0s
-table_manager:
-  retention_deletes_enabled: false
-  retention_period: 0s
-```
+[View loki-config.yaml](./loki-config.yaml)
 
 ### 3. Run Loki
 
@@ -90,6 +50,71 @@ Once Loki is running, you can send logs to it using various clients such as:
 - **Promtail**: Official log shipper for Loki.
 - **Serilog**: .NET logging with `Serilog.Sinks.GrafanaLoki`.
 - **C++ Clients**: Using `cURL` or HTTP requests.
+
+## Loki Log Basic Structure & Format
+
+Loki ingests logs in JSON format, structured as follows:
+
+```json
+{
+  "streams": [
+    {
+      "stream": {
+        "job": "my-app",
+        "host": "localhost"
+      },
+      "values": [["1672531200000000000", "This is a sample log entry"]]
+    }
+  ]
+}
+```
+
+### Breakdown:
+
+- **`stream`**: Contains labels that categorize logs (e.g., `job`, `host`).
+- **`values`**: A list of timestamped log entries.
+  - First value: UNIX timestamp in nanoseconds.
+  - Second value: Actual log message.
+
+## Custom Log Structure & Adding Fields
+
+Loki allows custom fields via labels in the `stream` section.
+
+### Example: Adding Custom Fields
+
+Modify the structure to include custom fields like `user_id` and `log_level`:
+
+```json
+{
+  "streams": [
+    {
+      "stream": {
+        "job": "my-app",
+        "host": "localhost",
+        "user_id": "12345",
+        "log_level": "info"
+      },
+      "values": [["1672531200000000000", "User logged in successfully"]]
+    }
+  ]
+}
+```
+
+### Steps to Implement Custom Fields
+
+1. Update your logging framework (e.g., Serilog, Fluentd, Promtail) to include custom labels.
+2. Modify the Loki ingestion request to pass additional metadata.
+3. Ensure your Loki queries filter by new labels (e.g., `{job="my-app", user_id="12345"}`).
+
+## Querying Logs with Custom Fields
+
+To filter logs based on custom fields, use Loki's LogQL:
+
+```logql
+{job="my-app", user_id="12345"} |= "User logged in"
+```
+
+This retrieves all logs where `user_id` is `12345` and the message contains "User logged in".
 
 ## Troubleshooting
 
