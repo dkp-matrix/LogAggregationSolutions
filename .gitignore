@@ -85,3 +85,7 @@ Thumbs.db
 *.zip
 *.7z
 *.bak
+
+# Ignore Folder
+
+LokiLogger_cpp/json/
